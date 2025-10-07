@@ -220,16 +220,7 @@ const { error: updateError } = await supabaseClient
     const photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
 
     statusMsg.textContent = "Saving data…";
-    const { error: updateError } = await supabaseClient
-      .from("property_records")
-      .update({
-        latitude: lat,
-        longitude: lon,
-        photo_url: photoUrl,
-        verified_by: verifier,            // ← use required name
-      })
-      .eq("id", selectedRecord.id);
-
+    
     if (updateError) throw updateError;
 
     // (Optional) remember name for next time
@@ -259,6 +250,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
