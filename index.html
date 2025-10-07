@@ -25,6 +25,55 @@
     .muted{color:#666;font-size:13px}
   </style>
 </head>
+  <script>
+async function loadRecords(selectedBatch = "") {
+  try {
+    // Fetch all records (filtered by batch if selected)
+    const queryAll = supabaseClient
+      .from("property_records")
+      .select("id,photo_url,latitude,longitude,batch_no,file_number,property_location")
+      .order("id", { ascending: true });
+
+    if (selectedBatch) queryAll.eq("batch_no", selectedBatch);
+    const { data, error } = await queryAll;
+    if (error) throw error;
+
+    // --- Compute progress ---
+    const total = data.length;
+    const verified = data.filter(r => r.photo_url || (r.latitude && r.longitude)).length;
+    const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
+
+    const progressLabel = selectedBatch
+      ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
+      : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
+
+    // Update summary text
+    document.getElementById("progressSummary").textContent = progressLabel;
+
+    // Update progress bar width
+    document.getElementById("progressBar").style.width = percent + "%";
+
+    // --- Populate property dropdown ---
+    const recordSelect = document.getElementById("recordSelect");
+    recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
+    data.forEach(rec => {
+      const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
+      const opt = document.createElement("option");
+      opt.value = rec.id;
+      opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
+      recordSelect.appendChild(opt);
+    });
+
+    // Populate batch dropdown only when all batches are shown
+    if (!selectedBatch) populateBatchFilter(data);
+
+  } catch (err) {
+    console.error(err);
+    alert("Error loading records: " + err.message);
+  }
+}
+</script>
+
 <body>
   <h2>🏗️ LASURA Property Ground-Truthing Dashboard</h2>
   <!-- Progress summary -->
@@ -305,6 +354,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
