@@ -245,52 +245,47 @@ function toMinnaUTM(lat, lon) {
 }
 
     // Save
-    saveBtn.addEventListener("click", async () => {
+  saveBtn.addEventListener("click", async () => {
   try {
     if (!selectedRecord) return alert("Select a record first.");
     if (lat === null || lon === null) return alert("Please capture GPS location.");
-    const { easting, northing } = toMinnaUTM(lat, lon);
-
-// then include in the update
-const { error: updateError } = await supabaseClient
-  .from("property_records")
-  .update({
-    latitude: lat,
-    longitude: lon,
-    easting: easting,
-    northing: northing,
-    photo_url: photoUrl,
-    verified_by: verifier
-  })
-  .eq("id", selectedRecord.id);
-    if (updateError) throw updateError;
-
-    
     const verifier = (verifierInput.value || "").trim();
-    if (!verifier) {
-      verifierInput.focus();
-      return alert("Please enter your name in the 'Verified By' field.");
-    }
+    if (!verifier) return alert("Please enter your name in 'Verified By'.");
     if (!photoFile) return alert("Please take or upload a photo.");
 
     statusMsg.textContent = "Uploading photo…";
-    const photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
+
+    // ✅ Declare before using
+    let photoUrl = null;
+
+    photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
 
     statusMsg.textContent = "Saving data…";
-    
-  
 
-    // (Optional) remember name for next time
-    localStorage.setItem("lasura_verifier_name", verifier);
+    const { easting, northing } = toMinnaUTM(lat, lon);
+
+    const { error: updateError } = await supabaseClient
+      .from("property_records")
+      .update({
+        latitude: lat,
+        longitude: lon,
+        easting: easting,
+        northing: northing,
+        photo_url: photoUrl,
+        verified_by: verifier,
+      })
+      .eq("id", selectedRecord.id);
+
+    if (updateError) throw updateError;
 
     statusMsg.textContent = "✅ Record updated successfully!";
     loadRecords(document.getElementById("batchFilter").value);
-    setTimeout(() => statusMsg.textContent = "", 4000);
   } catch (err) {
     console.error(err);
     statusMsg.textContent = "❌ " + err.message;
   }
 });
+
 const savedName = localStorage.getItem("lasura_verifier_name");
 if (savedName) verifierInput.value = savedName;
 
@@ -308,6 +303,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
