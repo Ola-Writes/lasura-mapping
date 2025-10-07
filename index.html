@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LASURA Property Ground-Truthing Dashboard</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Supabase (UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+
+  <style>
+    body{font-family:Arial, sans-serif;background:#f8f9fa;margin:0;padding:1rem}
+    h2{text-align:center;color:#0078d7;margin:0 0 1rem}
+    #map{height:300px;margin:1rem 0;border-radius:8px}
+    select,input,button{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;font-size:14px}
+    button{background:#0078d7;color:#fff;border:none;cursor:pointer}
+    button:hover{background:#005fa3}
+    .preview{text-align:center}
+    #photoPreview{max-width:100%;border-radius:8px;margin-top:10px}
+    .muted{color:#666;font-size:13px}
+  </style>
+</head>
+<body>
+  <h2>🏗️ LASURA Property Ground-Truthing Dashboard</h2>
+  <label for="batchFilter"><strong>Filter by Batch:</strong></label>
+<select id="batchFilter">
+  <option value="">-- All Batches --</option>
+</select>
+
+  <label for="recordSelect"><strong>Select Property Record:</strong></label>
+  <select id="recordSelect"></select>
+
+  <div id="recordDetails" style="display:none;">
+    <p><strong>File Number:</strong> <span id="fileNum"></span></p>
+    <p><strong>Location:</strong> <span id="propLoc"></span></p>
+    <button id="captureLocation">📍 Capture Current Location</button>
+    <div id="map"></div>
+
+    <label for="photoInput"><strong>📸 Take/Upload Photo:</strong></label>
+    <input type="file" id="photoInput" accept="image/*" capture="environment" />
+    <div class="preview"><img id="photoPreview" alt="Preview will appear here"/></div>
+
+    <label for="verifier"><strong>Verified By (optional):</strong></label>
+    <input id="verifier" placeholder="e.g., Field Officer A"/>
+
+    <button id="saveBtn">💾 Save Verification</button>
+    <p id="statusMsg" class="muted"></p>
+  </div>
+
+  <script>
+  (() => {
+    // ====== CONFIG (use exactly your values) ======
+    const SUPABASE_URL = "https://bjflekkcgmpcjliizaii.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqZmxla2tjZ21wY2psaWl6YWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MzA1ODIsImV4cCI6MjA3NTQwNjU4Mn0.xi9LrQuEcRcy-aMSemD8mEII6iKg91L9eqGy8Hpaueo";
+    const BUCKET = "groundtruth_photos";
+
+    // Supabase client (UMD exposes window.supabase)
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // UI elements
+    const recordSelect = document.getElementById("recordSelect");
+    const recordDetails = document.getElementById("recordDetails");
+    const fileNum = document.getElementById("fileNum");
+    const propLoc = document.getElementById("propLoc");
+    const captureBtn = document.getElementById("captureLocation");
+    const photoInput = document.getElementById("photoInput");
+    const photoPreview = document.getElementById("photoPreview");
+    const verifierInput = document.getElementById("verifier");
+    const saveBtn = document.getElementById("saveBtn");
+    const statusMsg = document.getElementById("statusMsg");
+
+    // Map
+    const map = L.map('map').setView([6.5244, 3.3792], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+    let marker = null;
+
+    // State
+    let selectedRecord = null;
+    let lat = null, lon = null, photoFile = null;
+
+    // Load records
+   // Populate both batch filter and property dropdown
+async function loadRecords(selectedBatch = "") {
+  try {
+    const query = supabaseClient
+      .from("property_records")
+      .select("id,file_number,property_location,batch_no")
+      .order("id", { ascending: true });
+
+    // if a batch is selected, filter the query
+    if (selectedBatch) query.eq("batch_no", selectedBatch);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Populate property dropdown
+    const recordSelect = document.getElementById("recordSelect");
+    recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
+    data.forEach(rec => {
+      const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
+      const opt = document.createElement("option");
+      opt.value = rec.id;
+      opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
+      recordSelect.appendChild(opt);
+    });
+
+    // Populate batch dropdown (only once, when no filter is selected)
+    if (!selectedBatch) populateBatchFilter(data);
+
+  } catch (err) {
+    console.error(err);
+    alert("Error loading records: " + err.message);
+  }
+}
+
+// Helper: extract unique batch numbers
+function populateBatchFilter(data) {
+  const batchFilter = document.getElementById("batchFilter");
+  const uniqueBatches = [...new Set(data.map(r => r.batch_no).filter(Boolean))].sort((a,b)=>a-b);
+  uniqueBatches.forEach(batch => {
+    const opt = document.createElement("option");
+    opt.value = batch;
+    opt.textContent = `Batch ${batch}`;
+    batchFilter.appendChild(opt);
+  });
+}
+    // On select record
+    recordSelect.addEventListener("change", async (e) => {
+      const id = e.target.value;
+      if (!id) { recordDetails.style.display = "none"; return; }
+      const { data, error } = await supabaseClient.from("property_records").select("*").eq("id", id).single();
+      if (error) { alert(error.message); return; }
+      selectedRecord = data;
+      fileNum.textContent = data.file_number || "—";
+      propLoc.textContent = data.property_location || "—";
+      recordDetails.style.display = "block";
+      // reset state
+      lat = lon = null; photoFile = null; photoPreview.removeAttribute("src");
+      if (marker) { map.removeLayer(marker); marker = null; }
+    });
+
+    // Capture GPS
+    captureBtn.addEventListener("click", () => {
+      if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
+      navigator.geolocation.getCurrentPosition((pos) => {
+        lat = pos.coords.latitude; lon = pos.coords.longitude;
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lon]).addTo(map)
+          .bindPopup(`Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`).openPopup();
+        map.setView([lat, lon], 17);
+      }, (err) => {
+        alert("Location error: " + err.message);
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    });
+
+    // Photo preview
+    photoInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      photoFile = file;
+      const reader = new FileReader();
+      reader.onload = (ev) => photoPreview.src = ev.target.result;
+      reader.readAsDataURL(file);
+    });
+
+    // Upload photo
+    async function uploadPhoto(file, recordId) {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const fileName = `record_${recordId}_${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabaseClient
+        .storage.from(BUCKET)
+        .upload(fileName, file, { cacheControl: "3600", upsert: false });
+      if (uploadError) throw uploadError;
+      return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${fileName}`;
+    }
+
+    // Save
+    saveBtn.addEventListener("click", async () => {
+      try {
+        if (!selectedRecord) return alert("Select a record first.");
+        if (lat === null || lon === null) return alert("Please capture GPS location.");
+        if (!photoFile) return alert("Please take or upload a photo.");
+
+        statusMsg.textContent = "Uploading photo…";
+        const photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
+
+        statusMsg.textContent = "Saving data…";
+        const { error: updateError } = await supabaseClient
+          .from("property_records")
+          .update({
+            latitude: lat,
+            longitude: lon,
+            photo_url: photoUrl,
+            verified_by: verifierInput.value || "Field Officer",
+          })
+          .eq("id", selectedRecord.id);
+
+        if (updateError) throw updateError;
+
+        statusMsg.textContent = "✅ Record updated successfully!";
+        setTimeout(() => statusMsg.textContent = "", 4000);
+      } catch (err) {
+        console.error(err);
+        statusMsg.textContent = "❌ " + err.message;
+      }
+    });
+
+    // Init
+    console.log("Supabase loaded:", window.supabase);
+    loadRecords();
+    // Handle batch filtering
+const batchFilter = document.getElementById("batchFilter");
+batchFilter.addEventListener("change", (e) => {
+  const selectedBatch = e.target.value;
+  loadRecords(selectedBatch); // reload dropdown filtered by batch
+});
+
+  })();
+  </script>
+</body>
+</html>
