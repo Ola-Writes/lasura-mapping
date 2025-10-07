@@ -79,17 +79,19 @@ async function loadRecords(selectedBatch = "") {
 }
 </script>
 
-<body>
-  <h2>🏗️ LASURA Property Ground-Truthing Dashboard</h2>
-  <!-- Progress summary -->
-<p id="progressSummary" style="text-align:center;font-weight:bold;color:#0078d7;margin-bottom:5px;">
+<body
+  <p id="progressSummary" style="text-align:center;font-weight:bold;color:#0078d7;margin-bottom:5px;">
   Loading progress…
 </p>
 
 <!-- Optional: progress bar -->
 <div id="progressBarContainer" style="width:90%;margin:0 auto 10px;height:10px;background:#e0e0e0;border-radius:5px;">
   <div id="progressBar" style="height:10px;width:0%;background:#0078d7;border-radius:5px;"></div>
-</div>
+</div> 
+  >
+  <h2>🏗️ LASURA Property Ground-Truthing Dashboard</h2>
+  <!-- Progress summary -->
+
   <script>
 async function loadRecords(selectedBatch = "") {
   try {
@@ -389,6 +391,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
