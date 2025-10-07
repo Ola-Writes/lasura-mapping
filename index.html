@@ -44,8 +44,8 @@
     <input type="file" id="photoInput" accept="image/*" capture="environment" />
     <div class="preview"><img id="photoPreview" alt="Preview will appear here"/></div>
 
-    <label for="verifier" required><strong>Verified By (optional):</strong></label>
-    <input id="verifier" placeholder="e.g., Field Officer A"/>
+    <label for="verifier"><strong>Verified By (optional):</strong></label>
+    <input id="verifier" placeholder="e.g., Field Officer A" required/>
 
     <button id="saveBtn">💾 Save Verification</button>
     <p id="statusMsg" class="muted"></p>
@@ -223,4 +223,5 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
