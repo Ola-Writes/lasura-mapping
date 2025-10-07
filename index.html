@@ -207,6 +207,7 @@ const { error: updateError } = await supabaseClient
     verified_by: verifier
   })
   .eq("id", selectedRecord.id);
+    if (updateError) throw updateError;
 
     
     const verifier = (verifierInput.value || "").trim();
@@ -221,7 +222,7 @@ const { error: updateError } = await supabaseClient
 
     statusMsg.textContent = "Saving data…";
     
-    if (updateError) throw updateError;
+  
 
     // (Optional) remember name for next time
     localStorage.setItem("lasura_verifier_name", verifier);
@@ -250,6 +251,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
