@@ -217,38 +217,38 @@ async function loadRecords(selectedBatch = "") {
 
     // Load records
    // Populate both batch filter and property dropdown
-async function loadRecords(selectedBatch = "") {
-  try {
-    const query = supabaseClient
-      .from("property_records")
-      .select("id,file_number,property_location,batch_no")
-      .order("id", { ascending: true });
+// async function loadRecords(selectedBatch = "") {
+//   try {
+//     const query = supabaseClient
+//       .from("property_records")
+//       .select("id,file_number,property_location,batch_no")
+//       .order("id", { ascending: true });
 
-    // if a batch is selected, filter the query
-    if (selectedBatch) query.eq("batch_no", selectedBatch);
+//     // if a batch is selected, filter the query
+//     if (selectedBatch) query.eq("batch_no", selectedBatch);
 
-    const { data, error } = await query;
-    if (error) throw error;
+//     const { data, error } = await query;
+//     if (error) throw error;
 
-    // Populate property dropdown
-    const recordSelect = document.getElementById("recordSelect");
-    recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
-    data.forEach(rec => {
-      const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
-      const opt = document.createElement("option");
-      opt.value = rec.id;
-      opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
-      recordSelect.appendChild(opt);
-    });
+//     // Populate property dropdown
+//     const recordSelect = document.getElementById("recordSelect");
+//     recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
+//     data.forEach(rec => {
+//       const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
+//       const opt = document.createElement("option");
+//       opt.value = rec.id;
+//       opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
+//       recordSelect.appendChild(opt);
+//     });
 
-    // Populate batch dropdown (only once, when no filter is selected)
-    if (!selectedBatch) populateBatchFilter(data);
+//     // Populate batch dropdown (only once, when no filter is selected)
+//     if (!selectedBatch) populateBatchFilter(data);
 
-  } catch (err) {
-    console.error(err);
-    alert("Error loading records: " + err.message);
-  }
-}
+//   } catch (err) {
+//     console.error(err);
+//     alert("Error loading records: " + err.message);
+//   }
+// }
 
 // Helper: extract unique batch numbers
 function populateBatchFilter(data) {
@@ -391,6 +391,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
