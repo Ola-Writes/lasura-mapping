@@ -7,8 +7,9 @@
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.1/dist/proj4.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+  
   <!-- Supabase (UMD) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
 
@@ -177,13 +178,37 @@ function populateBatchFilter(data) {
       if (uploadError) throw uploadError;
       return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${fileName}`;
     }
+// Define coordinate systems
+proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
+proj4.defs("EPSG:26331", "+proj=utm +zone=31 +ellps=clrk80 +towgs84=93.07,89.39,123.12,0,0,0,0 +units=m +no_defs");
+
+// Convert WGS84 -> Minna UTM 31
+function toMinnaUTM(lat, lon) {
+  const [x, y] = proj4("EPSG:4326", "EPSG:26331", [lon, lat]);
+  return { easting: x, northing: y };
+}
 
     // Save
     saveBtn.addEventListener("click", async () => {
   try {
     if (!selectedRecord) return alert("Select a record first.");
     if (lat === null || lon === null) return alert("Please capture GPS location.");
+    const { easting, northing } = toMinnaUTM(lat, lon);
 
+// then include in the update
+const { error: updateError } = await supabaseClient
+  .from("property_records")
+  .update({
+    latitude: lat,
+    longitude: lon,
+    easting: easting,
+    northing: northing,
+    photo_url: photoUrl,
+    verified_by: verifier
+  })
+  .eq("id", selectedRecord.id);
+
+    
     const verifier = (verifierInput.value || "").trim();
     if (!verifier) {
       verifierInput.focus();
@@ -234,6 +259,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
