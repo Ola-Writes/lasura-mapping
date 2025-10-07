@@ -44,8 +44,8 @@
     <input type="file" id="photoInput" accept="image/*" capture="environment" />
     <div class="preview"><img id="photoPreview" alt="Preview will appear here"/></div>
 
-    <label for="verifier"><strong>Verified By (optional):</strong></label>
-    <input id="verifier" placeholder="e.g., Field Officer A" required/>
+    <label for="verifier"><strong>Verified By (required):</strong></label>
+    <input id="verifier" placeholder="Enter your full name" required autocomplete="name"/>
 
     <button id="saveBtn">💾 Save Verification</button>
     <p id="statusMsg" class="muted"></p>
@@ -180,34 +180,43 @@ function populateBatchFilter(data) {
 
     // Save
     saveBtn.addEventListener("click", async () => {
-      try {
-        if (!selectedRecord) return alert("Select a record first.");
-        if (lat === null || lon === null) return alert("Please capture GPS location.");
-        if (!photoFile) return alert("Please take or upload a photo.");
+  try {
+    if (!selectedRecord) return alert("Select a record first.");
+    if (lat === null || lon === null) return alert("Please capture GPS location.");
 
-        statusMsg.textContent = "Uploading photo…";
-        const photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
+    const verifier = (verifierInput.value || "").trim();
+    if (!verifier) {
+      verifierInput.focus();
+      return alert("Please enter your name in the 'Verified By' field.");
+    }
+    if (!photoFile) return alert("Please take or upload a photo.");
 
-        statusMsg.textContent = "Saving data…";
-        const { error: updateError } = await supabaseClient
-          .from("property_records")
-          .update({
-            latitude: lat,
-            longitude: lon,
-            photo_url: photoUrl,
-            verified_by: verifierInput.value || "Field Officer",
-          })
-          .eq("id", selectedRecord.id);
+    statusMsg.textContent = "Uploading photo…";
+    const photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
 
-        if (updateError) throw updateError;
+    statusMsg.textContent = "Saving data…";
+    const { error: updateError } = await supabaseClient
+      .from("property_records")
+      .update({
+        latitude: lat,
+        longitude: lon,
+        photo_url: photoUrl,
+        verified_by: verifier,            // ← use required name
+      })
+      .eq("id", selectedRecord.id);
 
-        statusMsg.textContent = "✅ Record updated successfully!";
-        setTimeout(() => statusMsg.textContent = "", 4000);
-      } catch (err) {
-        console.error(err);
-        statusMsg.textContent = "❌ " + err.message;
-      }
-    });
+    if (updateError) throw updateError;
+
+    // (Optional) remember name for next time
+    localStorage.setItem("lasura_verifier_name", verifier);
+
+    statusMsg.textContent = "✅ Record updated successfully!";
+    setTimeout(() => statusMsg.textContent = "", 4000);
+  } catch (err) {
+    console.error(err);
+    statusMsg.textContent = "❌ " + err.message;
+  }
+});
 
     // Init
     console.log("Supabase loaded:", window.supabase);
@@ -223,5 +232,6 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
