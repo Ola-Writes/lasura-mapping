@@ -26,7 +26,7 @@
     .muted{color:#666;font-size:13px}
   </style>
 </head>
-  <script>
+  <!-- <script>
 async function loadRecords(selectedBatch = "") {
   try {
     // Fetch all records (filtered by batch if selected)
@@ -78,21 +78,29 @@ async function loadRecords(selectedBatch = "") {
     alert("Error loading records: " + err.message);
   }
 }
-</script>
+</script> -->
 
 <body>
   <h2>🏗️ LASURA Property Ground-Truthing Dashboard</h2>
-  <!-- Progress summary -->
-  <p id="progressSummary" style="text-align:center;font-weight:bold;color:#0078d7;margin-bottom:5px;">
+
+<!-- Progress summary -->
+<p id="progressSummary" style="text-align:center;font-weight:bold;color:#0078d7;margin-bottom:5px;">
   Loading progress…
 </p>
 
-<!-- Optional: progress bar -->
+<!-- Progress bar -->
 <div id="progressBarContainer" style="width:90%;margin:0 auto 10px;height:10px;background:#e0e0e0;border-radius:5px;">
   <div id="progressBar" style="height:10px;width:0%;background:#0078d7;border-radius:5px;"></div>
-</div> s
+</div>
 
-  <script>
+<!-- Batch Overview (red/green tiles) -->
+<div id="batchSummary" style="margin-top:10px;text-align:center;">
+  <h3 style="font-size:16px;">Batch Overview</h3>
+  <div id="batchList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>
+</div>
+
+
+  <!-- <script>
 async function loadRecords(selectedBatch = "") {
   try {
     const queryAll = supabaseClient
@@ -157,7 +165,7 @@ async function loadRecords(selectedBatch = "") {
   }
 }
 
-</script>
+</script> -->
 
   <label for="batchFilter"><strong>Filter by Batch:</strong></label>
 <select id="batchFilter">
@@ -221,16 +229,26 @@ async function loadRecords(selectedBatch = "") {
   try {
     const query = supabaseClient
       .from("property_records")
-      .select("id,file_number,property_location,batch_no")
+      .select("id,file_number,property_location,batch_no,latitude,longitude,photo_url")
       .order("id", { ascending: true });
 
-    // if a batch is selected, filter the query
     if (selectedBatch) query.eq("batch_no", selectedBatch);
-
     const { data, error } = await query;
     if (error) throw error;
 
-    // Populate property dropdown
+    // Compute progress
+    const total = data.length;
+    const verified = data.filter(r => r.photo_url || (r.latitude && r.longitude)).length;
+    const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
+
+    const progressLabel = selectedBatch
+      ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
+      : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
+
+    document.getElementById("progressSummary").textContent = progressLabel;
+    document.getElementById("progressBar").style.width = percent + "%";
+
+    // Populate dropdown
     const recordSelect = document.getElementById("recordSelect");
     recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
     data.forEach(rec => {
@@ -241,14 +259,36 @@ async function loadRecords(selectedBatch = "") {
       recordSelect.appendChild(opt);
     });
 
-    // Populate batch dropdown (only once, when no filter is selected)
     if (!selectedBatch) populateBatchFilter(data);
 
+    // Red/Green tiles
+    const batchList = document.getElementById("batchList");
+    batchList.innerHTML = "";
+    data.forEach(rec => {
+      const done = rec.photo_url || (rec.latitude && rec.longitude);
+      const tile = document.createElement("div");
+      tile.textContent = rec.id;
+      tile.style.padding = "6px 10px";
+      tile.style.borderRadius = "5px";
+      tile.style.fontSize = "13px";
+      tile.style.fontWeight = "bold";
+      tile.style.cursor = "pointer";
+      tile.style.color = "#fff";
+      tile.style.background = done ? "#28a745" : "#dc3545";
+      tile.title = rec.file_number;
+      tile.onclick = () => {
+        recordSelect.value = rec.id;
+        recordSelect.dispatchEvent(new Event("change"));
+        window.scrollTo({ top: 200, behavior: "smooth" });
+      };
+      batchList.appendChild(tile);
+    });
   } catch (err) {
     console.error(err);
     alert("Error loading records: " + err.message);
   }
 }
+
 
 // Helper: extract unique batch numbers
 function populateBatchFilter(data) {
@@ -391,6 +431,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
