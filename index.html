@@ -296,7 +296,7 @@ function toMinnaUTM(lat, lon) {
 }
 
     // Save
-  saveBtn.addEventListener("click", async () => {
+ saveBtn.addEventListener("click", async () => {
   try {
     if (!selectedRecord) return alert("Select a record first.");
     if (lat === null || lon === null) return alert("Please capture GPS location.");
@@ -304,13 +304,23 @@ function toMinnaUTM(lat, lon) {
     if (!verifier) return alert("Please enter your name in 'Verified By'.");
     if (!photoFile) return alert("Please take or upload a photo.");
 
+    // 🛡️ Step 1: Check if record already verified
+    const { data: existing, error: fetchError } = await supabaseClient
+      .from("property_records")
+      .select("photo_url, latitude, longitude")
+      .eq("id", selectedRecord.id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    if (existing && (existing.photo_url || (existing.latitude && existing.longitude))) {
+      alert("⚠️ This record has already been verified and cannot be modified.");
+      return; // Stop here — do not overwrite
+    }
+
+    // Proceed normally if record is still unverified
     statusMsg.textContent = "Uploading photo…";
-
-    // ✅ Declare before using
-    let photoUrl = null;
-
-    photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
-
+    let photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
     statusMsg.textContent = "Saving data…";
 
     const { easting, northing } = toMinnaUTM(lat, lon);
@@ -329,13 +339,15 @@ function toMinnaUTM(lat, lon) {
 
     if (updateError) throw updateError;
 
-    statusMsg.textContent = "✅ Record updated successfully!";
+    statusMsg.textContent = "✅ Record verified successfully!";
     loadRecords(document.getElementById("batchFilter").value);
+
   } catch (err) {
     console.error(err);
     statusMsg.textContent = "❌ " + err.message;
   }
 });
+ 
 
 const savedName = localStorage.getItem("lasura_verifier_name");
 if (savedName) verifierInput.value = savedName;
@@ -354,6 +366,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
