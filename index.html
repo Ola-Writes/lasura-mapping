@@ -217,6 +217,8 @@ function populateBatchFilter(data) {
     statusMsg.textContent = "❌ " + err.message;
   }
 });
+const savedName = localStorage.getItem("lasura_verifier_name");
+if (savedName) verifierInput.value = savedName;
 
     // Init
     console.log("Supabase loaded:", window.supabase);
@@ -232,6 +234,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
