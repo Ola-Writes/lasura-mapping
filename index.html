@@ -39,6 +39,11 @@ async function loadRecords(selectedBatch = "") {
     if (error) throw error;
 
     // --- Compute progress ---
+    <div id="batchSummary" style="margin-top:10px;">
+  <h3 style="font-size:16px;">Batch Overview</h3>
+  <div id="batchList" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+</div>
+
     const total = data.length;
     const verified = data.filter(r => r.photo_url || (r.latitude && r.longitude)).length;
     const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
@@ -88,7 +93,6 @@ async function loadRecords(selectedBatch = "") {
   <script>
 async function loadRecords(selectedBatch = "") {
   try {
-    // Fetch all records (filtered by batch if selected)
     const queryAll = supabaseClient
       .from("property_records")
       .select("id,photo_url,latitude,longitude,batch_no,file_number,property_location")
@@ -107,13 +111,10 @@ async function loadRecords(selectedBatch = "") {
       ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
       : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
 
-    // Update summary text
     document.getElementById("progressSummary").textContent = progressLabel;
-
-    // Update progress bar width
     document.getElementById("progressBar").style.width = percent + "%";
 
-    // --- Populate property dropdown ---
+    // --- Populate dropdown ---
     const recordSelect = document.getElementById("recordSelect");
     recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
     data.forEach(rec => {
@@ -124,14 +125,36 @@ async function loadRecords(selectedBatch = "") {
       recordSelect.appendChild(opt);
     });
 
-    // Populate batch dropdown only when all batches are shown
     if (!selectedBatch) populateBatchFilter(data);
+
+    // --- 🟢 NEW: Visual batch overview ---
+    const batchList = document.getElementById("batchList");
+    batchList.innerHTML = ""; // clear old
+    data.forEach(rec => {
+      const done = rec.photo_url || (rec.latitude && rec.longitude);
+      const btn = document.createElement("div");
+      btn.textContent = `${rec.id}`;
+      btn.style.padding = "6px 8px";
+      btn.style.borderRadius = "4px";
+      btn.style.fontSize = "13px";
+      btn.style.cursor = "pointer";
+      btn.style.color = "#fff";
+      btn.style.background = done ? "#1f9c35" : "#d93025"; // green or red
+      btn.title = rec.file_number;
+      btn.onclick = () => {
+        recordSelect.value = rec.id;
+        recordSelect.dispatchEvent(new Event("change"));
+        window.scrollTo({ top: 200, behavior: "smooth" });
+      };
+      batchList.appendChild(btn);
+    });
 
   } catch (err) {
     console.error(err);
     alert("Error loading records: " + err.message);
   }
 }
+
 </script>
 
   <label for="batchFilter"><strong>Filter by Batch:</strong></label>
@@ -366,6 +389,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
