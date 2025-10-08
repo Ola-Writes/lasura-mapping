@@ -52,6 +52,11 @@
   <select id="recordSelect">
     <option value="">-- Select Record --</option>
   </select>
+  <!-- Record details section -->
+<div id="recordDetails" style="margin-top:10px;display:none;border:1px solid #ddd;padding:8px;border-radius:5px;background:#f9f9f9;">
+  <p><strong>🏠 Subject Matter:</strong> <span id="subjectMatter">—</span></p>
+  <p><strong>📍 Property Location:</strong> <span id="propertyLocation">—</span></p>
+</div>
 
   <br/><br/>
 
@@ -214,13 +219,12 @@
 
       const recordSelect = document.getElementById("recordSelect");
       recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
-      data.forEach(rec => {
-        const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
-        const opt = document.createElement("option");
-        opt.value = rec.id;
-        opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
-        recordSelect.appendChild(opt);
-      });
+     data.forEach(rec => {
+       const opt = document.createElement("option");
+       opt.value = rec.id;
+       opt.textContent = rec.file_number; // show only file_number
+       recordSelect.appendChild(opt);
+});
 
       if (!selectedBatch) populateBatchFilter(data);
 
@@ -247,24 +251,40 @@
 
   // === Handle record selection ===
   recordSelect.addEventListener("change", async (e) => {
-    const id = e.target.value;
-    if (!id) return;
-    const { data, error } = await supabaseClient
-      .from("property_records")
-      .select("*").eq("id", id).single();
-    if (error) return console.error(error);
-    selectedRecord = data;
+  const id = e.target.value;
+  const detailsBox = document.getElementById("recordDetails");
+  const subjectSpan = document.getElementById("subjectMatter");
+  const locationSpan = document.getElementById("propertyLocation");
 
-    // Display existing photos
-    previewContainer.innerHTML = "";
-    if (data.photo_urls && data.photo_urls.length) {
-      data.photo_urls.forEach(url => {
-        const img = document.createElement("img");
-        img.src = url;
-        previewContainer.appendChild(img);
-      });
-    }
-  });
+  if (!id) {
+    detailsBox.style.display = "none";
+    subjectSpan.textContent = "—";
+    locationSpan.textContent = "—";
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("property_records")
+    .select("*").eq("id", id).single();
+  if (error) return console.error(error);
+  selectedRecord = data;
+
+  // Show details
+  detailsBox.style.display = "block";
+  subjectSpan.textContent = data.subject_matter || "—";
+  locationSpan.textContent = data.property_location || "—";
+
+  // Display existing photos
+  previewContainer.innerHTML = "";
+  if (data.photo_urls && data.photo_urls.length) {
+    data.photo_urls.forEach(url => {
+      const img = document.createElement("img");
+      img.src = url;
+      previewContainer.appendChild(img);
+    });
+  }
+});
+
 
   // === Batch filter change ===
   batchFilter.addEventListener("change", (e) => loadRecords(e.target.value));
@@ -274,3 +294,4 @@
   </script>
 </body>
 </html>
+
