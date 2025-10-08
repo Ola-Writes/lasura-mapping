@@ -1,471 +1,276 @@
-<script>
-const photoInput = document.getElementById("photoInput");
-const previewContainer = document.getElementById("previewContainer");
-let selectedPhotos = [];
-
-photoInput.addEventListener("change", () => {
-  previewContainer.innerHTML = "";
-  selectedPhotos = Array.from(photoInput.files);
-
-  selectedPhotos.forEach(file => {
-    const img = document.createElement("img");
-    img.src = URL.createObjectURL(file);
-    img.style.width = "70px";
-    img.style.height = "70px";
-    img.style.objectFit = "cover";
-    img.style.borderRadius = "4px";
-    img.style.border = "1px solid #ccc";
-    previewContainer.appendChild(img);
-  });
-});
-<script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
   <title>LASURA Property Ground-Truthing Dashboard</title>
-  
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <!-- Supabase + Proj4 libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.1/dist/proj4.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <!-- Supabase (UMD) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
 
   <style>
-    body{font-family:Arial, sans-serif;background:#f8f9fa;margin:0;padding:1rem}
-    h2{text-align:center;color:#0078d7;margin:0 0 1rem}
-    #map{height:300px;margin:1rem 0;border-radius:8px}
-    select,input,button{width:100%;padding:10px;margin:6px 0;border-radius:6px;border:1px solid #ccc;font-size:14px}
-    button{background:#0078d7;color:#fff;border:none;cursor:pointer}
-    button:hover{background:#005fa3}
-    .preview{text-align:center}
-    #photoPreview{max-width:100%;border-radius:8px;margin-top:10px}
-    .muted{color:#666;font-size:13px}
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { text-align: center; color: #0078d7; }
+    label { font-weight: bold; }
+    #progressBarContainer { width: 90%; margin: 0 auto 10px; height: 10px; background:#e0e0e0; border-radius:5px; }
+    #progressBar { height:10px; width:0%; background:#0078d7; border-radius:5px; }
+    #batchList div { min-width:40px; text-align:center; font-weight:600; color:#fff; border-radius:5px; padding:6px 8px; cursor:pointer; }
+    #previewContainer img { width:70px; height:70px; object-fit:cover; border:1px solid #ccc; border-radius:4px; margin:3px; }
+    #status { text-align:center; margin-top:10px; font-weight:bold; }
   </style>
 </head>
-  <!-- <script>
-async function loadRecords(selectedBatch = "") {
-  try {
-    // Fetch all records (filtered by batch if selected)
-    const queryAll = supabaseClient
-      .from("property_records")
-      .select("id,photo_url,latitude,longitude,batch_no,file_number,property_location")
-      .order("id", { ascending: true });
-
-    if (selectedBatch) queryAll.eq("batch_no", selectedBatch);
-    const { data, error } = await queryAll;
-    if (error) throw error;
-
-    // --- Compute progress ---
-    <div id="batchSummary" style="margin-top:10px;">
-  <h3 style="font-size:16px;">Batch Overview</h3>
-  <div id="batchList" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
-</div>
-
-    const total = data.length;
-    const verified = data.filter(r => r.photo_url || (r.latitude && r.longitude)).length;
-    const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
-
-    const progressLabel = selectedBatch
-      ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
-      : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
-
-    // Update summary text
-    document.getElementById("progressSummary").textContent = progressLabel;
-
-    // Update progress bar width
-    document.getElementById("progressBar").style.width = percent + "%";
-
-    // --- Populate property dropdown ---
-    const recordSelect = document.getElementById("recordSelect");
-    recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
-    data.forEach(rec => {
-      const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
-      const opt = document.createElement("option");
-      opt.value = rec.id;
-      opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
-      recordSelect.appendChild(opt);
-    });
-
-    // Populate batch dropdown only when all batches are shown
-    if (!selectedBatch) populateBatchFilter(data);
-
-  } catch (err) {
-    console.error(err);
-    alert("Error loading records: " + err.message);
-  }
-}
-</script> -->
 
 <body>
   <h2>🏗️ LASURA Property Ground-Truthing Dashboard</h2>
 
-<!-- Progress summary -->
-<p id="progressSummary" style="text-align:center;font-weight:bold;color:#0078d7;margin-bottom:5px;">
-  Loading progress…
-</p>
-
-<!-- Progress bar -->
-<div id="progressBarContainer" style="width:90%;margin:0 auto 10px;height:10px;background:#e0e0e0;border-radius:5px;">
-  <div id="progressBar" style="height:10px;width:0%;background:#0078d7;border-radius:5px;"></div>
-</div>
-
-<!-- Batch Overview (red/green tiles) -->
-<div id="batchSummary" style="margin-top:10px;text-align:center;">
-  <h3 style="font-size:16px;">Batch Overview</h3>
-  <div id="batchList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>
-</div>
-
-
-  <!-- <script>
-async function loadRecords(selectedBatch = "") {
-  try {
-    const queryAll = supabaseClient
-      .from("property_records")
-      .select("id,photo_url,latitude,longitude,batch_no,file_number,property_location")
-      .order("id", { ascending: true });
-
-    if (selectedBatch) queryAll.eq("batch_no", selectedBatch);
-    const { data, error } = await queryAll;
-    if (error) throw error;
-
-    // --- Compute progress ---
-    const total = data.length;
-    const verified = data.filter(r => r.photo_url || (r.latitude && r.longitude)).length;
-    const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
-
-    const progressLabel = selectedBatch
-      ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
-      : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
-
-    document.getElementById("progressSummary").textContent = progressLabel;
-    document.getElementById("progressBar").style.width = percent + "%";
-
-    // --- Populate dropdown ---
-    const recordSelect = document.getElementById("recordSelect");
-    recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
-    data.forEach(rec => {
-      const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
-      const opt = document.createElement("option");
-      opt.value = rec.id;
-      opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
-      recordSelect.appendChild(opt);
-    });
-
-    if (!selectedBatch) populateBatchFilter(data);
-
-    // --- 🟢 NEW: Visual batch overview ---
-    const batchList = document.getElementById("batchList");
-    batchList.innerHTML = ""; // clear old
-    data.forEach(rec => {
-      const done = rec.photo_url || (rec.latitude && rec.longitude);
-      const btn = document.createElement("div");
-      btn.textContent = `${rec.id}`;
-      btn.style.padding = "6px 8px";
-      btn.style.borderRadius = "4px";
-      btn.style.fontSize = "13px";
-      btn.style.cursor = "pointer";
-      btn.style.color = "#fff";
-      btn.style.background = done ? "#1f9c35" : "#d93025"; // green or red
-      btn.title = rec.file_number;
-      btn.onclick = () => {
-        recordSelect.value = rec.id;
-        recordSelect.dispatchEvent(new Event("change"));
-        window.scrollTo({ top: 200, behavior: "smooth" });
-      };
-      batchList.appendChild(btn);
-    });
-
-  } catch (err) {
-    console.error(err);
-    alert("Error loading records: " + err.message);
-  }
-}
-
-</script> -->
-
-  <label for="batchFilter"><strong>Filter by Batch:</strong></label>
-<select id="batchFilter">
-  <option value="">-- All Batches --</option>
-</select>
-
-  <label for="recordSelect"><strong>Select Property Record:</strong></label>
-  <select id="recordSelect"></select>
-
-  <div id="recordDetails" style="display:none;">
-    <p><strong>File Number:</strong> <span id="fileNum"></span></p>
-    <p><strong>Location:</strong> <span id="propLoc"></span></p>
-    <button id="captureLocation">📍 Capture Current Location</button>
-    <div id="map"></div>
-
-    <label for="photoInput"><strong>📸 Take/Upload Photo:</strong></label>
-    <input type="file" id="photoInput" accept="image/*" capture="environment" />
-    <div class="preview"><img id="photoPreview" alt="Preview will appear here"/></div>
-
-    <label for="verifier"><strong>Verified By (required):</strong></label>
-    <input id="verifier" placeholder="Enter your full name" required autocomplete="name"/>
-
-    <button id="saveBtn">💾 Save Verification</button>
-    <p id="statusMsg" class="muted"></p>
+  <!-- Progress summary -->
+  <p id="progressSummary" style="text-align:center;font-weight:bold;color:#0078d7;margin-bottom:5px;">
+    Loading progress…
+  </p>
+  <div id="progressBarContainer">
+    <div id="progressBar"></div>
   </div>
 
+  <!-- Batch overview -->
+  <div id="batchSummary" style="margin-top:10px;text-align:center;">
+    <h3 style="font-size:16px;">Batch Overview</h3>
+    <div id="batchList" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;"></div>
+  </div>
+
+  <br/>
+
+  <!-- Batch filter -->
+  <label>Filter by Batch:</label>
+  <select id="batchFilter">
+    <option value="">-- All Batches --</option>
+  </select>
+
+  <br/><br/>
+
+  <!-- Record selection -->
+  <label>Select Property Record:</label>
+  <select id="recordSelect">
+    <option value="">-- Select Record --</option>
+  </select>
+
+  <br/><br/>
+
+  <!-- Officer name -->
+  <label>Verified By (required):</label>
+  <input id="verifier" placeholder="Enter your full name" required autocomplete="name" />
+
+  <br/><br/>
+
+  <!-- Multi-photo input -->
+  <label>📸 Take/Upload Photos:</label>
+  <input type="file" id="photoInput" accept="image/*" multiple capture="environment" />
+  <div id="previewContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;"></div>
+
+  <br/>
+  <button id="captureBtn">📍 Capture GPS Location</button>
+  <button id="saveBtn">💾 Save Verification</button>
+
+  <p id="status"></p>
+
+  <!-- ========================== SCRIPT SECTION =========================== -->
   <script>
-  (() => {
-    // ====== CONFIG (use exactly your values) ======
-    const SUPABASE_URL = "https://bjflekkcgmpcjliizaii.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqZmxla2tjZ21wY2psaWl6YWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MzA1ODIsImV4cCI6MjA3NTQwNjU4Mn0.xi9LrQuEcRcy-aMSemD8mEII6iKg91L9eqGy8Hpaueo";
-    const BUCKET = "groundtruth_photos";
+  const SUPABASE_URL = "https://bjflekkcgmpcjliizaii.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqZmxla2tjZ21wY2psaWl6YWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MzA1ODIsImV4cCI6MjA3NTQwNjU4Mn0.xi9LrQuEcRcy-aMSemD8mEII6iKg91L9eqGy8Hpaueo";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Supabase client (UMD exposes window.supabase)
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // UI elements
-    const recordSelect = document.getElementById("recordSelect");
-    const recordDetails = document.getElementById("recordDetails");
-    const fileNum = document.getElementById("fileNum");
-    const propLoc = document.getElementById("propLoc");
-    const captureBtn = document.getElementById("captureLocation");
-    const photoInput = document.getElementById("photoInput");
-    const photoPreview = document.getElementById("photoPreview");
-    const verifierInput = document.getElementById("verifier");
-    const saveBtn = document.getElementById("saveBtn");
-    const statusMsg = document.getElementById("statusMsg");
-
-    // Map
-    const map = L.map('map').setView([6.5244, 3.3792], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
-    let marker = null;
-
-    // State
-    let selectedRecord = null;
-    let lat = null, lon = null, photoFile = null;
-
-    // Load records
-   // Populate both batch filter and property dropdown
-async function loadRecords(selectedBatch = "") {
-  try {
-    const query = supabaseClient
-      .from("property_records")
-      .select("id,file_number,property_location,batch_no,latitude,longitude,photo_url")
-      .order("id", { ascending: true });
-
-    if (selectedBatch) query.eq("batch_no", selectedBatch);
-    const { data, error } = await query;
-    if (error) throw error;
-
-    // Compute progress
-    const total = data.length;
-    const verified = data.filter(r => r.photo_url || (r.latitude && r.longitude)).length;
-    const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
-
-    const progressLabel = selectedBatch
-      ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
-      : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
-
-    document.getElementById("progressSummary").textContent = progressLabel;
-    document.getElementById("progressBar").style.width = percent + "%";
-
-    // Populate dropdown
-    const recordSelect = document.getElementById("recordSelect");
-    recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
-    data.forEach(rec => {
-      const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
-      const opt = document.createElement("option");
-      opt.value = rec.id;
-      opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
-      recordSelect.appendChild(opt);
-    });
-
-    if (!selectedBatch) populateBatchFilter(data);
-
-    // Red/Green tiles
-    const batchList = document.getElementById("batchList");
-    batchList.innerHTML = "";
-    data.forEach(rec => {
-      const done = rec.photo_url || (rec.latitude && rec.longitude);
-      const tile = document.createElement("div");
-      tile.textContent = rec.id;
-      tile.style.padding = "6px 10px";
-      tile.style.borderRadius = "5px";
-      tile.style.fontSize = "13px";
-      tile.style.fontWeight = "bold";
-      tile.style.cursor = "pointer";
-      tile.style.color = "#fff";
-      tile.style.background = done ? "#28a745" : "#dc3545";
-      tile.title = rec.file_number;
-      tile.onclick = () => {
-        recordSelect.value = rec.id;
-        recordSelect.dispatchEvent(new Event("change"));
-        window.scrollTo({ top: 200, behavior: "smooth" });
-      };
-      batchList.appendChild(tile);
-    });
-  } catch (err) {
-    console.error(err);
-    alert("Error loading records: " + err.message);
-  }
-}
-
-
-// Helper: extract unique batch numbers
-function populateBatchFilter(data) {
+  // === Global references ===
+  const recordSelect = document.getElementById("recordSelect");
   const batchFilter = document.getElementById("batchFilter");
-  const uniqueBatches = [...new Set(data.map(r => r.batch_no).filter(Boolean))].sort((a,b)=>a-b);
-  uniqueBatches.forEach(batch => {
-    const opt = document.createElement("option");
-    opt.value = batch;
-    opt.textContent = `Batch ${batch}`;
-    batchFilter.appendChild(opt);
-  });
-}
-    // On select record
-    recordSelect.addEventListener("change", async (e) => {
-      const id = e.target.value;
-      if (!id) { recordDetails.style.display = "none"; return; }
-      const { data, error } = await supabaseClient.from("property_records").select("*").eq("id", id).single();
-      if (error) { alert(error.message); return; }
-      selectedRecord = data;
-      fileNum.textContent = data.file_number || "—";
-      propLoc.textContent = data.property_location || "—";
-      recordDetails.style.display = "block";
-      // reset state
-      lat = lon = null; photoFile = null; photoPreview.removeAttribute("src");
-      if (marker) { map.removeLayer(marker); marker = null; }
-    });
+  const verifierInput = document.getElementById("verifier");
+  const statusMsg = document.getElementById("status");
+  const photoInput = document.getElementById("photoInput");
+  const previewContainer = document.getElementById("previewContainer");
+  let selectedRecord = null, lat = null, lon = null, selectedPhotos = [];
 
-    // Capture GPS
-    captureBtn.addEventListener("click", () => {
-      if (!navigator.geolocation) { alert("Geolocation not supported."); return; }
-      navigator.geolocation.getCurrentPosition((pos) => {
-        lat = pos.coords.latitude; lon = pos.coords.longitude;
-        if (marker) map.removeLayer(marker);
-        marker = L.marker([lat, lon]).addTo(map)
-          .bindPopup(`Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`).openPopup();
-        map.setView([lat, lon], 17);
-      }, (err) => {
-        alert("Location error: " + err.message);
-      }, { enableHighAccuracy: true, timeout: 15000 });
-    });
-
-    // Photo preview
-    photoInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      photoFile = file;
-      const reader = new FileReader();
-      reader.onload = (ev) => photoPreview.src = ev.target.result;
-      reader.readAsDataURL(file);
-    });
-
-//     // Upload photo
-// <label>📸 Take/Upload Photos:</label>
-// <input type="file" id="photoInput" accept="image/*" multiple capture="environment" />
-// <div id="previewContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;"></div>
-
-// Define coordinate systems
-proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
-proj4.defs("EPSG:26331", "+proj=utm +zone=31 +ellps=clrk80 +towgs84=93.07,89.39,123.12,0,0,0,0 +units=m +no_defs");
-
-// Convert WGS84 -> Minna UTM 31
-function toMinnaUTM(lat, lon) {
-  const [x, y] = proj4("EPSG:4326", "EPSG:26331", [lon, lat]);
-  return { easting: x, northing: y };
-}
-
-    // Save
- saveBtn.addEventListener("click", async () => {
-  try {
-    if (!selectedRecord) return alert("Select a record first.");
-    if (lat === null || lon === null) return alert("Please capture GPS location.");
-    const verifier = (verifierInput.value || "").trim();
-    if (!verifier) return alert("Please enter your name in 'Verified By'.");
-    if (!photoFile) return alert("Please take or upload a photo.");
-
-    // 🛡️ Step 1: Check if record already verified
-    const { data: existing, error: fetchError } = await supabaseClient
-      .from("property_records")
-      .select("photo_url, latitude, longitude")
-      .eq("id", selectedRecord.id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    if (existing && (existing.photo_url || (existing.latitude && existing.longitude))) {
-      alert("⚠️ This record has already been verified and cannot be modified.");
-      return; // Stop here — do not overwrite
-    }
-
-    // Proceed normally if record is still unverified
-    statusMsg.textContent = "Uploading photo…";
-    let photoUrl = await uploadPhoto(photoFile, selectedRecord.id);
-    statusMsg.textContent = "Saving data…";
-
-    const { easting, northing } = toMinnaUTM(lat, lon);
-
-    const { error: updateError } = await supabaseClient
-      .from("property_records")
-      .update({
-        latitude: lat,
-        longitude: lon,
-        easting: easting,
-        northing: northing,
-        photo_url: photoUrl,
-        verified_by: verifier,
-      })
-      .eq("id", selectedRecord.id);
-
-    if (updateError) throw updateError;
-
-    statusMsg.textContent = "✅ Record verified successfully!";
-    loadRecords(document.getElementById("batchFilter").value);
-
-  } catch (err) {
-    console.error(err);
-    statusMsg.textContent = "❌ " + err.message;
+  // === Define projections ===
+  proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
+  proj4.defs("EPSG:26331", "+proj=utm +zone=31 +ellps=clrk80 +towgs84=93.07,89.39,123.12,0,0,0,0 +units=m +no_defs");
+  function toMinnaUTM(lat, lon) {
+    const [x, y] = proj4("EPSG:4326", "EPSG:26331", [lon, lat]);
+    return { easting: x, northing: y };
   }
-});
- 
 
-const savedName = localStorage.getItem("lasura_verifier_name");
-if (savedName) verifierInput.value = savedName;
+  // === Preview multiple photos ===
+  photoInput.addEventListener("change", () => {
+    previewContainer.innerHTML = "";
+    selectedPhotos = Array.from(photoInput.files);
+    selectedPhotos.forEach(file => {
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(file);
+      previewContainer.appendChild(img);
+    });
+  });
 
-    // Init
-    console.log("Supabase loaded:", window.supabase);
-    loadRecords();
-    // Handle batch filtering
-const batchFilter = document.getElementById("batchFilter");
-batchFilter.addEventListener("change", (e) => {
-  const selectedBatch = e.target.value;
-  loadRecords(selectedBatch); // reload dropdown filtered by batch
-});
+  // === Capture GPS ===
+  document.getElementById("captureBtn").onclick = () => {
+    if (!navigator.geolocation) return alert("Geolocation not supported.");
+    navigator.geolocation.getCurrentPosition(pos => {
+      lat = pos.coords.latitude;
+      lon = pos.coords.longitude;
+      alert(`📍 Location captured!\nLatitude: ${lat}\nLongitude: ${lon}`);
+    }, err => alert("Unable to get location: " + err.message));
+  };
 
-  })();
+  // === Upload multiple photos ===
+  async function uploadPhotos(files, recordId) {
+    const urls = [];
+    const bucket = "groundtruth_photos"; // ensure this bucket exists
+    for (const file of files) {
+      const uniqueName = `${recordId}_${Date.now()}_${file.name}`;
+      const { data, error } = await supabaseClient.storage
+        .from(bucket)
+        .upload(`record_${recordId}/${uniqueName}`, file, { upsert: false });
+      if (error) throw error;
+      const { data: publicUrlData } = supabaseClient
+        .storage.from(bucket)
+        .getPublicUrl(`record_${recordId}/${uniqueName}`);
+      urls.push(publicUrlData.publicUrl);
+    }
+    return urls;
+  }
+
+  // === Save verification ===
+  document.getElementById("saveBtn").addEventListener("click", async () => {
+    try {
+      if (!selectedRecord) return alert("Select a record first.");
+      if (lat === null || lon === null) return alert("Please capture GPS location.");
+      const verifier = (verifierInput.value || "").trim();
+      if (!verifier) return alert("Please enter your name in 'Verified By'.");
+      if (selectedPhotos.length === 0) return alert("Please select at least one photo.");
+
+      // Check if already verified
+      const { data: existing } = await supabaseClient
+        .from("property_records")
+        .select("photo_urls,latitude,longitude")
+        .eq("id", selectedRecord.id).single();
+      if (existing && (existing.photo_urls?.length || (existing.latitude && existing.longitude))) {
+        return alert("⚠️ This record has already been verified and cannot be modified.");
+      }
+
+      statusMsg.textContent = "Uploading photos…";
+      const photoUrls = await uploadPhotos(selectedPhotos, selectedRecord.id);
+
+      statusMsg.textContent = "Saving data…";
+      const { easting, northing } = toMinnaUTM(lat, lon);
+      const { error: updateError } = await supabaseClient
+        .from("property_records")
+        .update({
+          latitude: lat,
+          longitude: lon,
+          easting: easting,
+          northing: northing,
+          photo_urls: photoUrls,
+          verified_by: verifier
+        })
+        .eq("id", selectedRecord.id);
+      if (updateError) throw updateError;
+
+      statusMsg.textContent = "✅ Record verified successfully!";
+      setTimeout(() => (statusMsg.textContent = ""), 4000);
+      loadRecords(batchFilter.value);
+    } catch (err) {
+      console.error(err);
+      statusMsg.textContent = "❌ " + err.message;
+    }
+  });
+
+  // === Populate batches ===
+  function populateBatchFilter(data) {
+    const uniqueBatches = [...new Set(data.map(r => r.batch_no).filter(Boolean))].sort((a,b)=>a-b);
+    batchFilter.innerHTML = "<option value=''>-- All Batches --</option>";
+    uniqueBatches.forEach(batch => {
+      const opt = document.createElement("option");
+      opt.value = batch;
+      opt.textContent = `Batch ${batch}`;
+      batchFilter.appendChild(opt);
+    });
+  }
+
+  // === Load records + progress ===
+  async function loadRecords(selectedBatch = "") {
+    try {
+      const query = supabaseClient
+        .from("property_records")
+        .select("id,file_number,property_location,batch_no,latitude,longitude,photo_urls")
+        .order("id", { ascending: true });
+      if (selectedBatch) query.eq("batch_no", selectedBatch);
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const total = data.length;
+      const verified = data.filter(r => r.photo_urls?.length || (r.latitude && r.longitude)).length;
+      const percent = total ? ((verified / total) * 100).toFixed(1) : 0;
+
+      const label = selectedBatch
+        ? `Batch ${selectedBatch}: ✅ ${verified} verified / ${total} total (${percent}%)`
+        : `All Batches: ✅ ${verified} verified / ${total} total (${percent}%)`;
+      document.getElementById("progressSummary").textContent = label;
+      document.getElementById("progressBar").style.width = percent + "%";
+
+      const recordSelect = document.getElementById("recordSelect");
+      recordSelect.innerHTML = "<option value=''>-- Select Record --</option>";
+      data.forEach(rec => {
+        const bn = rec.batch_no ? ` (Batch ${rec.batch_no})` : "";
+        const opt = document.createElement("option");
+        opt.value = rec.id;
+        opt.textContent = `${rec.id} - ${rec.file_number}${bn}`;
+        recordSelect.appendChild(opt);
+      });
+
+      if (!selectedBatch) populateBatchFilter(data);
+
+      const batchList = document.getElementById("batchList");
+      batchList.innerHTML = "";
+      data.forEach(rec => {
+        const done = rec.photo_urls?.length || (rec.latitude && rec.longitude);
+        const tile = document.createElement("div");
+        tile.textContent = rec.id;
+        tile.style.background = done ? "#28a745" : "#dc3545";
+        tile.title = rec.file_number;
+        tile.onclick = () => {
+          recordSelect.value = rec.id;
+          recordSelect.dispatchEvent(new Event("change"));
+          window.scrollTo({ top: 200, behavior: "smooth" });
+        };
+        batchList.appendChild(tile);
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error loading records: " + err.message);
+    }
+  }
+
+  // === Handle record selection ===
+  recordSelect.addEventListener("change", async (e) => {
+    const id = e.target.value;
+    if (!id) return;
+    const { data, error } = await supabaseClient
+      .from("property_records")
+      .select("*").eq("id", id).single();
+    if (error) return console.error(error);
+    selectedRecord = data;
+
+    // Display existing photos
+    previewContainer.innerHTML = "";
+    if (data.photo_urls && data.photo_urls.length) {
+      data.photo_urls.forEach(url => {
+        const img = document.createElement("img");
+        img.src = url;
+        previewContainer.appendChild(img);
+      });
+    }
+  });
+
+  // === Batch filter change ===
+  batchFilter.addEventListener("change", (e) => loadRecords(e.target.value));
+
+  // === Initial load ===
+  loadRecords();
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
