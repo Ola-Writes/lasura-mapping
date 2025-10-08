@@ -1,4 +1,24 @@
+<script>
+const photoInput = document.getElementById("photoInput");
+const previewContainer = document.getElementById("previewContainer");
+let selectedPhotos = [];
 
+photoInput.addEventListener("change", () => {
+  previewContainer.innerHTML = "";
+  selectedPhotos = Array.from(photoInput.files);
+
+  selectedPhotos.forEach(file => {
+    const img = document.createElement("img");
+    img.src = URL.createObjectURL(file);
+    img.style.width = "70px";
+    img.style.height = "70px";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "4px";
+    img.style.border = "1px solid #ccc";
+    previewContainer.appendChild(img);
+  });
+});
+<script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -342,15 +362,10 @@ function populateBatchFilter(data) {
     });
 
     // Upload photo
-    async function uploadPhoto(file, recordId) {
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-      const fileName = `record_${recordId}_${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabaseClient
-        .storage.from(BUCKET)
-        .upload(fileName, file, { cacheControl: "3600", upsert: false });
-      if (uploadError) throw uploadError;
-      return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${fileName}`;
-    }
+   <label>📸 Take/Upload Photos:</label>
+<input type="file" id="photoInput" accept="image/*" multiple capture="environment" />
+<div id="previewContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;"></div>
+ }
 // Define coordinate systems
 proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
 proj4.defs("EPSG:26331", "+proj=utm +zone=31 +ellps=clrk80 +towgs84=93.07,89.39,123.12,0,0,0,0 +units=m +no_defs");
@@ -432,6 +447,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
