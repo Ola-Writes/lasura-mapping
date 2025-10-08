@@ -362,9 +362,27 @@ function populateBatchFilter(data) {
     });
 
     // Upload photo
-   <label>📸 Take/Upload Photos:</label>
-<input type="file" id="photoInput" accept="image/*" multiple capture="environment" />
-<div id="previewContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;"></div>
+async function uploadPhotos(files, recordId) {
+  const urls = [];
+  const bucket = "property_photos"; // or your existing bucket name
+
+  for (const file of files) {
+    const uniqueName = `${recordId}_${Date.now()}_${file.name}`;
+    const { data, error } = await supabaseClient.storage
+      .from(bucket)
+      .upload(`record_${recordId}/${uniqueName}`, file, { upsert: false });
+
+    if (error) throw error;
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from(bucket)
+      .getPublicUrl(`record_${recordId}/${uniqueName}`);
+
+    urls.push(publicUrlData.publicUrl);
+  }
+
+  return urls;
+}
  }
 // Define coordinate systems
 proj4.defs("EPSG:4326", "+proj=longlat +datum=WGS84 +no_defs");
@@ -447,6 +465,7 @@ batchFilter.addEventListener("change", (e) => {
   </script>
 </body>
 </html>
+
 
 
 
