@@ -267,25 +267,31 @@ const { error: updateError } = await supabaseClient
   const detailsBox = document.getElementById("recordDetails");
   const subjectSpan = document.getElementById("subjectMatter");
   const locationSpan = document.getElementById("propertyLocation");
-document.getElementById("newAddress").value = data.new_address || "";
+  const newAddressInput = document.getElementById("newAddress");
 
   if (!id) {
     detailsBox.style.display = "none";
     subjectSpan.textContent = "—";
     locationSpan.textContent = "—";
+    newAddressInput.value = "";
     return;
   }
 
   const { data, error } = await supabaseClient
     .from("property_records")
-    .select("*").eq("id", id).single();
-  if (error) return console.error(error);
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) { 
+    console.error(error);
+    return;
+  }
   selectedRecord = data;
-
   // Show details
   detailsBox.style.display = "block";
   subjectSpan.textContent = data.subject || "—";
   locationSpan.textContent = data.property_location || "—";
+  newAddressInput.value = data.new_address || "";
 
   // Display existing photos
   previewContainer.innerHTML = "";
@@ -307,6 +313,7 @@ document.getElementById("newAddress").value = data.new_address || "";
   </script>
 </body>
 </html>
+
 
 
 
