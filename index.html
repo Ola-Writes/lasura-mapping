@@ -52,10 +52,18 @@
   <select id="recordSelect">
     <option value="">-- Select Record --</option>
   </select>
+  
   <!-- Record details section -->
+  <p><strong>🏗️ New Address:</strong> <span id="savedNewAddress">—</span></p>
 <div id="recordDetails" style="margin-top:10px;display:none;border:1px solid #ddd;padding:8px;border-radius:5px;background:#f9f9f9;">
   <p><strong>🏠 Subject Matter:</strong> <span id="subjectMatter">—</span></p>
   <p><strong>📍 Property Location:</strong> <span id="propertyLocation">—</span></p>
+</div>
+<!-- Optional New Address Field -->
+<div id="newAddressContainer" style="margin-top:10px;">
+  <label for="newAddress"><strong>🏗️ New Address (optional):</strong></label><br>
+  <input type="text" id="newAddress" placeholder="Enter new or corrected address if applicable" 
+    style="width:95%;padding:5px;border-radius:4px;border:1px solid #ccc;" />
 </div>
 
   <br/><br/>
@@ -162,17 +170,21 @@
 
       statusMsg.textContent = "Saving data…";
       const { easting, northing } = toMinnaUTM(lat, lon);
-      const { error: updateError } = await supabaseClient
-        .from("property_records")
-        .update({
-          latitude: lat,
-          longitude: lon,
-          easting: easting,
-          northing: northing,
-          photo_urls: photoUrls,
-          verified_by: verifier
-        })
-        .eq("id", selectedRecord.id);
+      const newAddress = document.getElementById("newAddress").value.trim();
+
+const { error: updateError } = await supabaseClient
+  .from("property_records")
+  .update({
+    latitude: lat,
+    longitude: lon,
+    easting: easting,
+    northing: northing,
+    photo_urls: photoUrls,
+    verified_by: verifier,
+    new_address: newAddress || null
+  })
+  .eq("id", selectedRecord.id);
+
       if (updateError) throw updateError;
 
       statusMsg.textContent = "✅ Record verified successfully!";
@@ -255,6 +267,7 @@
   const detailsBox = document.getElementById("recordDetails");
   const subjectSpan = document.getElementById("subjectMatter");
   const locationSpan = document.getElementById("propertyLocation");
+document.getElementById("newAddress").value = data.new_address || "";
 
   if (!id) {
     detailsBox.style.display = "none";
@@ -294,5 +307,6 @@
   </script>
 </body>
 </html>
+
 
 
