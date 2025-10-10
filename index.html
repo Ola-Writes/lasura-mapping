@@ -112,7 +112,7 @@
     let selectedPhotos = [];
 
     async function loadRecords() {
-      const { data, error } = await supabaseClient;
+      const { data, error } = await supabaseClient
         .from('property_records')
         .select('*')
         .order('file_number', { ascending: true });
@@ -259,5 +259,6 @@
   </script>
 </body>
 </html>
+
 
 
