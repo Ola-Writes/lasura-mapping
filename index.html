@@ -250,7 +250,7 @@
         const tile = document.createElement('div');
         tile.classList.add('record-tile');
         tile.classList.add(record.photo_urls && record.photo_urls.length > 0 ? 'verified' : 'unverified');
-        tile.innerHTML = `<strong>${record.file_number}`;
+        tile.innerHTML = `<strong>${record.id}`;
         container.appendChild(tile);
       });
     }
@@ -259,6 +259,7 @@
   </script>
 </body>
 </html>
+
 
 
 
