@@ -136,7 +136,7 @@
       records.forEach(record => {
         const option = document.createElement('option');
         option.value = record.id;
-        option.textContent = record.file_number;
+        option.textContent = record.property_location;
         recordSelect.appendChild(option);
       });
     }
@@ -259,6 +259,7 @@
   </script>
 </body>
 </html>
+
 
 
 
