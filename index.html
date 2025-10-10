@@ -103,9 +103,9 @@
   <div id="batchOverview"></div>
 
   <script>
-    const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co';
-    const SUPABASE_KEY = 'YOUR-ANON-KEY';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_URL = "https://bjflekkcgmpcjliizaii.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqZmxla2tjZ21wY2psaWl6YWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MzA1ODIsImV4cCI6MjA3NTQwNjU4Mn0.xi9LrQuEcRcy-aMSemD8mEII6iKg91L9eqGy8Hpaueo";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let allRecords = [];
     let selectedRecord = null;
@@ -259,3 +259,4 @@
   </script>
 </body>
 </html>
+
