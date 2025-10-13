@@ -6,69 +6,40 @@
   <title>LASURA Property Ground-Truthing Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+
+  <!-- =========================
+       Styles (clean + organized)
+       ========================= -->
   <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f8f9fa; }
+    h2 { color: #343a40; }
+    select, input, button { margin: 5px 0; padding: 8px; width: 100%; }
 
- 
-    
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background-color: #f8f9fa;
-    }
-    h2 {
-      color: #343a40;
-    }
-    select, input, button {
-      margin: 5px 0;
-      padding: 8px;
-      width: 100%;
-    }
-    .progress-container {
-      background-color: #e9ecef;
-      border-radius: 10px;
-      overflow: hidden;
-      margin: 10px 0;
-    }
-    .progress-bar {
-      background-color: #28a745;
-      height: 20px;
-      width: 0%;
-      color: white;
-      text-align: center;
-    }
-    #map {
-      width: 100%;
-      height: 300px;
-      background-color: #dcdcdc;
-      margin: 10px 0;
-    }
-    .record-tile {
-      dsiplay: flex;
-      border-radius: 10px;
-      padding: 10px;
-      margin: 5px;
-      color: white;
-      justify-content: justify;
-      
-      align-items: centre;
-      /* width: 10px;
-      height: 10px; */
-      text-align: center;
-    }
-    .verified {
-      background-color: #28a745;
-    }
-    .unverified {
-      background-color: #dc3545;
-    }
+    .progress-container { background-color: #e9ecef; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+    .progress-bar { background-color: #28a745; height: 20px; width: 0%; color: white; text-align: center; }
 
-    #batchOverview{
-      display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-    }
+    /* Tile box + grid */
+    #tileBox { max-width: 100%; border: 1px solid #e1e1e1; background: #fff; border-radius: 10px; padding: 10px; margin-top: 8px; }
+    #batchOverview { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+    /* Compact, rounded tiles (kept as-is per current UI) */
+    .record-tile { width: 56px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 12px; font-weight: bold; font-size: 12px; color: #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: transform 0.1s ease, box-shadow 0.2s ease; }
+    .record-tile:hover { transform: scale(1.05); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    .record-tile.selected { outline: 3px solid #ffc107; }
+    .verified { background-color: #28a745; }
+    .unverified { background-color: #dc3545; }
+
+    /* Photo section */
+    .photo-section .button { display: inline-block; background: #007bff; color: white; padding: 8px 14px; margin: 6px 5px 10px 0; border-radius: 6px; cursor: pointer; font-weight: 600; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .photo-section .button:hover { background: #0056b3; }
+    .button.danger { background: #dc3545; }
+    .button.danger:hover { background: #a71d2a; }
+
+    #previewContainer { display: flex; flex-wrap: wrap; gap: 6px; }
+    #previewContainer img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #ccc; }
   </style>
 </head>
+
 <body>
   <h2>LASURA Property Ground-Truthing Dashboard</h2>
 
@@ -101,8 +72,17 @@
     <p>Latitude: <span id="latitude"></span> | Longitude: <span id="longitude"></span></p>
   </div>
 
-  <div>
-    <input type="file" id="photoUpload" accept="image/*" multiple />
+  <!-- Photo capture: camera + gallery + clear -->
+  <div class="photo-section">
+    <label for="cameraInput" class="button">📷 Capture with Camera</label>
+    <input type="file" id="cameraInput" accept="image/*" capture="camera" style="display:none;">
+
+    <label for="galleryInput" class="button">🖼️ Choose from Gallery</label>
+    <input type="file" id="galleryInput" accept="image/*" multiple capture="filesystem" style="display:none;">
+
+    <button id="clearPhotos" class="button danger">🗑 Clear Photos</button>
+
+    <div id="previewContainer"></div>
   </div>
 
   <div>
@@ -113,181 +93,178 @@
     <div id="progressBar" class="progress-bar">0%</div>
   </div>
 
-  <div id="batchOverview"></div>
+  <!-- Horizontal IDs grid -->
+  <div id="tileBox">
+    <div id="batchOverview"></div>
+  </div>
 
+  <!-- =========================
+       Scripts (clean + organized)
+       ========================= -->
   <script>
+    // --- Supabase + Projections ---
     const SUPABASE_URL = "https://bjflekkcgmpcjliizaii.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqZmxla2tjZ21wY2psaWl6YWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MzA1ODIsImV4cCI6MjA3NTQwNjU4Mn0.xi9LrQuEcRcy-aMSemD8mEII6iKg91L9eqGy8Hpaueo";
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    proj4.defs("EPSG:26331", "+proj=utm +zone=31 +datum=Minna +units=m +no_defs");
 
-    let allRecords = [];
+    // --- State ---
+    let currentBatchRecords = [];
     let selectedRecord = null;
     let selectedPhotos = [];
 
+    // --- Batches ---
+    async function loadBatches() {
+      const { data, error } = await supabaseClient
+        .from('property_records')
+        .select('batch_no')
+        .not('batch_no', 'is', null);
+      if (error) { console.error('Error loading batches', error); return; }
+      const uniqueBatches = [...new Set(data.map(r => r.batch_no))];
+      const batchSelect = document.getElementById('batchSelect');
+      batchSelect.innerHTML = '<option value="">-- Select Batch --</option>';
+      uniqueBatches.forEach(batch => {
+        const option = document.createElement('option');
+        option.value = batch; option.textContent = batch; batchSelect.appendChild(option);
+      });
+    }
+
+    // --- Records ---
     async function loadRecords() {
+      const selectedBatch = document.getElementById('batchSelect').value;
+      if (!selectedBatch) {
+        document.getElementById('recordSelect').innerHTML = '<option value="">Select Record to Verify</option>';
+        document.getElementById('batchOverview').innerHTML = '';
+        updateProgress([]);
+        return;
+      }
       const { data, error } = await supabaseClient
         .from('property_records')
         .select('*')
+        .eq('batch_no', selectedBatch)
         .order('file_number', { ascending: true });
+      if (error) { alert('Error loading records'); console.error(error); return; }
+      currentBatchRecords = data;
+      const searchValue = document.getElementById('searchInput').value.toLowerCase().trim();
+      const recordsToShow = searchValue
+        ? currentBatchRecords.filter(r => r.property_location && r.property_location.toLowerCase().includes(searchValue))
+        : currentBatchRecords;
+      refreshDisplay(recordsToShow);
+    }
 
-      if (error) {
-        alert('Error loading records');
-        console.error(error);
-        return;
-      }
-
-      allRecords = data;
-      populateDropdown(data);
-      updateProgress(data);
-      renderBatchOverview(data);
+    function refreshDisplay(records) {
+      populateDropdown(records);
+      renderBatchOverview(records);
+      updateProgress(records);
     }
 
     function populateDropdown(records) {
       const recordSelect = document.getElementById('recordSelect');
       recordSelect.innerHTML = '<option value="">Select Record to Verify</option>';
-
       records.forEach(record => {
         const option = document.createElement('option');
-        option.value = record.id;
-        option.textContent = record.property_location;
-        recordSelect.appendChild(option);
+        option.value = record.id; option.textContent = record.file_number; recordSelect.appendChild(option);
       });
     }
 
+    // --- Search ---
     document.getElementById('searchButton').addEventListener('click', () => {
       const searchValue = document.getElementById('searchInput').value.toLowerCase().trim();
-      if (!searchValue) {
-        alert('Enter a location to search');
-        return;
-      }
-      const filtered = allRecords.filter(record =>
-        record.property_location && record.property_location.toLowerCase().includes(searchValue)
-      );
-      populateDropdown(filtered);
+      if (!searchValue) { alert('Enter a location to search'); return; }
+      const filtered = currentBatchRecords.filter(r => r.property_location && r.property_location.toLowerCase().includes(searchValue));
+      refreshDisplay(filtered);
     });
-
     document.getElementById('resetButton').addEventListener('click', () => {
       document.getElementById('searchInput').value = '';
-      populateDropdown(allRecords);
+      refreshDisplay(currentBatchRecords);
     });
 
+    // --- Selection + Details + Highlight ---
     function displayRecordInfo() {
       const recordId = document.getElementById('recordSelect').value;
-      selectedRecord = allRecords.find(r => r.id == recordId);
+      selectedRecord = currentBatchRecords.find(r => r.id == recordId);
       if (!selectedRecord) return;
       document.getElementById('subject').textContent = selectedRecord.subject || '';
       document.getElementById('propertyLocation').textContent = selectedRecord.property_location || '';
       document.getElementById('savedNewAddress').textContent = selectedRecord.new_address || '';
-    }
-
-    function captureLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(position => {
-          document.getElementById('latitude').textContent = position.coords.latitude;
-          document.getElementById('longitude').textContent = position.coords.longitude;
-        });
-      } else {
-        alert('Geolocation is not supported by this browser.');
-      }
-    }
-
-    async function saveVerification() {
-      if (!selectedRecord) {
-        alert('Please select a record first.');
-        return;
-      }
-
-      const latitude = parseFloat(document.getElementById('latitude').textContent);
-      const longitude = parseFloat(document.getElementById('longitude').textContent);
-      const newAddress = document.getElementById('newAddressInput').value;
-      const files = document.getElementById('photoUpload').files;
-
-      if (!latitude || !longitude) {
-        alert('Capture GPS before saving.');
-        return;
-      }
-
-      const [easting, northing] = proj4('EPSG:4326', 'EPSG:26331', [longitude, latitude]);
-
-      const photoUrls = [];
-      for (let file of files) {
-        const { data: uploadedFile, error } = await supabase.storage
-          .from('groundtruth_photos')
-          .upload(`record_${selectedRecord.id}/${file.name}`, file, { upsert: true });
-
-        if (!error) {
-          const { data: publicUrlData } = supabase.storage
-            .from('groundtruth_photos')
-            .getPublicUrl(uploadedFile.path);
-          photoUrls.push(publicUrlData.publicUrl);
-        }
-      }
-
-      const { error } = await supabase
-        .from('property_records')
-        .update({
-          latitude,
-          longitude,
-          easting,
-          northing,
-          photo_urls: photoUrls,
-          verified_by: 'Officer',
-          new_address: newAddress,
-        })
-        .eq('id', selectedRecord.id);
-
-      if (error) {
-        alert('Error saving record');
-        console.error(error);
-      } else {
-        alert('Record saved successfully!');
-        document.getElementById('savedNewAddress').textContent = newAddress;
-        loadRecords();
-      }
-    }
-
-    function updateProgress(records) {
-      const verifiedCount = records.filter(r => r.photo_urls && r.photo_urls.length > 0).length;
-      const total = records.length;
-      const percent = total ? Math.round((verifiedCount / total) * 100) : 0;
-      const progressBar = document.getElementById('progressBar');
-      progressBar.style.width = percent + '%';
-      progressBar.textContent = percent + '%';
+      document.querySelectorAll('.record-tile.selected').forEach(el => el.classList.remove('selected'));
+      const activeTile = Array.from(document.querySelectorAll('.record-tile')).find(tile => tile.textContent.trim() == recordId.toString());
+      if (activeTile) activeTile.classList.add('selected');
     }
 
     function renderBatchOverview(records) {
       const container = document.getElementById('batchOverview');
       container.innerHTML = '';
-
-      records.forEach(record => {
+      const toKey = v => { const n = Number(v); return Number.isFinite(n) ? n : String(v); };
+      const sorted = [...records].sort((a, b) => { const A = toKey(a.id), B = toKey(b.id); return A < B ? -1 : A > B ? 1 : 0; });
+      sorted.forEach(record => {
         const tile = document.createElement('div');
         tile.classList.add('record-tile');
         tile.classList.add(record.photo_urls && record.photo_urls.length > 0 ? 'verified' : 'unverified');
-        tile.innerHTML = `<strong>${record.id}`;
+        tile.innerHTML = `<strong>${record.id}</strong>`;
+        tile.addEventListener('click', () => {
+          document.querySelectorAll('.record-tile.selected').forEach(el => el.classList.remove('selected'));
+          tile.classList.add('selected');
+          selectedRecord = record; const sel = document.getElementById('recordSelect'); if (sel) sel.value = record.id;
+          document.getElementById('subject').textContent = record.subject || '';
+          document.getElementById('propertyLocation').textContent = record.property_location || '';
+          document.getElementById('savedNewAddress').textContent = record.new_address || '';
+          tile.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        });
         container.appendChild(tile);
       });
     }
 
-    loadRecords();
+    // --- GPS ---
+    function captureLocation() {
+      if (!navigator.geolocation) { alert('Geolocation is not supported by this browser.'); return; }
+      navigator.geolocation.getCurrentPosition(pos => {
+        document.getElementById('latitude').textContent = pos.coords.latitude;
+        document.getElementById('longitude').textContent = pos.coords.longitude;
+      });
+    }
+
+    // --- Photos (camera + gallery + clear + previews) ---
+    document.getElementById('cameraInput').addEventListener('change', handlePhotos);
+    document.getElementById('galleryInput').addEventListener('change', handlePhotos);
+    document.getElementById('clearPhotos').addEventListener('click', () => {
+      if (selectedPhotos.length === 0) { alert('No photos to clear.'); return; }
+      if (confirm('Are you sure you want to clear all selected photos?')) {
+        selectedPhotos = []; document.getElementById('previewContainer').innerHTML = '';
+      }
+    });
+
+    function handlePhotos(event) { selectedPhotos = selectedPhotos.concat(Array.from(event.target.files)); showPreviews(); }
+    function showPreviews() {
+      const preview = document.getElementById('previewContainer');
+      preview.innerHTML = '';
+      selectedPhotos.forEach(file => { const reader = new FileReader(); reader.onload = e => { const img = document.createElement('img'); img.src = e.target.result; preview.appendChild(img); }; reader.readAsDataURL(file); });
+    }
+
+    // --- Save Verification ---
+    async function saveVerification() {
+      if (!selectedRecord) { alert('Please select a record first.'); return; }
+      const latitude = parseFloat(document.getElementById('latitude').textContent);
+      const longitude = parseFloat(document.getElementById('longitude').textContent);
+      const newAddress = document.getElementById('newAddressInput').value;
+      const files = selectedPhotos; // consolidated source
+      if (!latitude || !longitude) { alert('Capture GPS before saving.'); return; }
+      if (!files || files.length < 2) { alert('Please upload at least two photos before saving.'); return; }
+      const [easting, northing] = proj4('EPSG:4326', 'EPSG:26331', [longitude, latitude]);
+      const photoUrls = [];
+      for (let file of files) {
+        const filePath = `record_${selectedRecord.id}/${file.name}`;
+        const { error: uploadError } = await supabaseClient.storage.from('groundtruth_photos').upload(filePath, file, { upsert: true });
+        if (uploadError) { console.error(uploadError); alert('Error uploading file: ' + file.name); continue; }
+        const { data: { publicUrl } } = supabaseClient.storage.from('groundtruth_photos').getPublicUrl(filePath);
+        photoUrls.push(publicUrl);
+      }
+      const { error } = await supabaseClient.from('property_records').update({ latitude, longitude, easting, northing, photo_urls: photoUrls, verified_by: 'Officer', new_address: newAddress }).eq('id', selectedRecord.id);
+      if (error) { alert('Error saving record'); console.error(error); } else { alert('Record saved successfully!'); document.getElementById('savedNewAddress').textContent = newAddress; loadRecords(); }
+    }
+
+    // --- Init ---
+    loadBatches();
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
